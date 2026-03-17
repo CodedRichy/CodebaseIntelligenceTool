@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from api.routes import router as api_router
 
 app = FastAPI(title="Codebase Intelligence API", version="1.0.0")
 
@@ -16,7 +17,5 @@ app.add_middleware(
 async def root():
     return {"message": "Codebase Intelligence API"}
 
-# Import routers here as we create them
-# from api.routes import repo, query
-# app.include_router(repo.router)
-# app.include_router(query.router)
+# Include API routes
+app.include_router(api_router, prefix="/api", tags=["api"])
