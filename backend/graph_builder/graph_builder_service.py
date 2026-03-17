@@ -91,13 +91,15 @@ class GraphBuilderService:
                     MATCH (f:File {path: $file_path})
                     MERGE (c:Class {name: $name, file_path: $file_path})
                     ON CREATE SET c.start_line = $start_line,
-                                  c.end_line = $end_line
+                                  c.end_line = $end_line,
+                                  c.content = $content
                     MERGE (f)-[:DEFINES]->(c)
                     """,
                     file_path=cls.file_path,
                     name=cls.name,
                     start_line=cls.start_line,
-                    end_line=cls.end_line
+                    end_line=cls.end_line,
+                    content=cls.content
                 )
 
             # Create function nodes
@@ -107,13 +109,15 @@ class GraphBuilderService:
                     MATCH (f:File {path: $file_path})
                     MERGE (fn:Function {name: $name, file_path: $file_path})
                     ON CREATE SET fn.start_line = $start_line,
-                                  fn.end_line = $end_line
+                                  fn.end_line = $end_line,
+                                  fn.content = $content
                     MERGE (f)-[:DEFINES]->(fn)
                     """,
                     file_path=func.file_path,
                     name=func.name,
                     start_line=func.start_line,
-                    end_line=func.end_line
+                    end_line=func.end_line,
+                    content=func.content
                 )
 
     def create_relationships(self, import_relationships: List[Dict],

@@ -5,12 +5,13 @@ import tree_sitter_javascript
 
 class CodeElement:
     def __init__(self, name: str, type_: str, file_path: str,
-                 start_line: int, end_line: int, **kwargs):
+                 start_line: int, end_line: int, content: str = "", **kwargs):
         self.name = name
         self.type = type_
         self.file_path = file_path
         self.start_line = start_line
         self.end_line = end_line
+        self.content = content  # Raw source code snippet
         self.extra_data = kwargs
 
 class ImportElement:
@@ -66,15 +67,15 @@ class ParserService:
             tree = parser.parse(code)
 
             if ext == '.py':
-                return self._parse_python_file(tree.root_node, file_path)
+                return self._parse_python_file(tree.root_node, file_path, code.decode('utf-8', errors='ignore'))
             elif ext in ['.js', '.ts']:
-                return self._parse_javascript_file(tree.root_node, file_path)
+                return self._parse_javascript_file(tree.root_node, file_path, code.decode('utf-8', errors='ignore'))
 
         except Exception as e:
             print(f"Error parsing file {file_path}: {e}")
             return None
 
-    def _parse_python_file(self, root_node: Node, file_path: str) -> Dict:
+    def _parse_python_file(self, root_node: Node, file_path: str, full_code: str) -> Dict[str, Any]:
         """Parse Python file AST and extract elements."""
         classes = []
         functions = []
@@ -90,7 +91,8 @@ class ParserService:
                         type_='class',
                         file_path=file_path,
                         start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1
+                        end_line=node.end_point[0] + 1,
+                        content=full_code[node.start_byte:node.end_byte]
                     ))
 
             elif node.type == 'function_definition':
@@ -101,7 +103,8 @@ class ParserService:
                         type_='function',
                         file_path=file_path,
                         start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1
+                        end_line=node.end_point[0] + 1,
+                        content=full_code[node.start_byte:node.end_byte]
                     ))
                     current_function = func_name
 
@@ -132,7 +135,7 @@ class ParserService:
             'function_calls': function_calls
         }
 
-    def _parse_javascript_file(self, root_node: Node, file_path: str) -> Dict:
+    def _parse_javascript_file(self, root_node: Node, file_path: str, full_code: str) -> Dict[str, Any]:
         """Parse JavaScript/TypeScript file AST and extract elements."""
         classes = []
         functions = []
@@ -148,7 +151,8 @@ class ParserService:
                         type_='class',
                         file_path=file_path,
                         start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1
+                        end_line=node.end_point[0] + 1,
+                        content=full_code[node.start_byte:node.end_byte]
                     ))
 
             elif node.type in ['function_declaration', 'arrow_function', 'function_expression']:
@@ -159,7 +163,8 @@ class ParserService:
                         type_='function',
                         file_path=file_path,
                         start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1
+                        end_line=node.end_point[0] + 1,
+                        content=full_code[node.start_byte:node.end_byte]
                     ))
                     current_function = func_name
 

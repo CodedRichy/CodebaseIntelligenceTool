@@ -113,12 +113,11 @@ class AIEngine:
         # Get relevant context from the knowledge graph based on query type
         graph_context = self._get_graph_context(query, query_type)
         
-        # Build context string for the prompt
         context_parts = []
-        if graph_context.get('files'):
-            context_parts.append("Relevant Files:")
-            for f in graph_context['files']:
-                context_parts.append(f"- {f['path']}")
+        if graph_context.get('code_snippets'):
+            context_parts.append("Relevant Code Snippets:")
+            for s in graph_context['code_snippets']:
+                context_parts.append(f"### File: {s['path']} (Element: {s['element_name']})\n```\n{s['content']}\n```")
         
         if graph_context.get('dependencies'):
             context_parts.append("\nCode Relationships:")
@@ -139,7 +138,8 @@ User Question: {query}
 Instructions:
 - Be technical and precise.
 - Reference specific files and relationships from the context.
-- If the context doesn't contain the answer, tell the user what's missing.
+- Use the provided code snippets to explain the implementation logic if applicable.
+- If the context doesn't contain enough information, tell the user what's missing.
 - Use a professional SaaS engineer tone."""
 
         # Get answer from Grok
@@ -176,20 +176,20 @@ Instructions:
         # General file/class context for explanation or other queries
         if 'auth' in query.lower() or (target and 'auth' in target.lower()):
             query_cypher = """
-            MATCH (f:File)-[:DEFINES]->(c:Class)
-            WHERE c.name =~ '(?i).*auth.*' OR f.path =~ '(?i).*auth.*'
-            RETURN f.path as path, c.name as class_name
+            MATCH (f:File)-[:DEFINES]->(element)
+            WHERE element.name =~ '(?i).*auth.*' OR f.path =~ '(?i).*auth.*'
+            RETURN f.path as path, element.name as element_name, element.content as content
             """
-            context['files'] = self.graph_service.query_codebase(query_cypher)
+            context['code_snippets'] = self.graph_service.query_codebase(query_cypher)
         
-        if not context.get('files') and target:
-            # Search for the target in the graph
+        if not context.get('code_snippets') and target:
+            # Search for the target in the graph and get its code
             query_cypher = f"""
-            MATCH (f:File)
-            WHERE f.path CONTAINS '{target}'
-            RETURN f.path as path
+            MATCH (f:File)-[:DEFINES]->(element)
+            WHERE f.path CONTAINS '{target}' OR element.name CONTAINS '{target}'
+            RETURN f.path as path, element.name as element_name, element.content as content
             """
-            context['files'] = self.graph_service.query_codebase(query_cypher)
+            context['code_snippets'] = self.graph_service.query_codebase(query_cypher)
 
         return context
 

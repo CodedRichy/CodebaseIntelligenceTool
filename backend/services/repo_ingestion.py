@@ -19,13 +19,24 @@ class RepoIngestionService:
         self.temp_dir = tempfile.mkdtemp()
 
     async def clone_repository(self, repo_url: str) -> RepositoryInfo:
-        """Clone a Git repository to a temporary directory."""
+        """Clone a Git repository or use a local path."""
         try:
+            # Handle local paths
+            if os.path.isdir(repo_url):
+                repo_name = os.path.basename(repo_url)
+                return RepositoryInfo(
+                    url=repo_url,
+                    local_path=repo_url,
+                    name=repo_name
+                )
+
+            # Handle remote URLs
             repo_name = repo_url.split('/')[-1].replace('.git', '')
             local_path = os.path.join(self.temp_dir, repo_name)
 
-            # Clone the repository
-            Repo.clone_from(repo_url, local_path)
+            # Optimized: Use shallow clone (depth=1) to save time/bandwidth
+            if not os.path.exists(local_path):
+                Repo.clone_from(repo_url, local_path, depth=1)
 
             return RepositoryInfo(
                 url=repo_url,
@@ -33,7 +44,7 @@ class RepoIngestionService:
                 name=repo_name
             )
         except Exception as e:
-            raise Exception(f"Failed to clone repository {repo_url}: {str(e)}")
+            raise Exception(f"Failed to clone/access repository {repo_url}: {str(e)}")
 
     async def scan_repository(self, repo_info: RepositoryInfo) -> RepositoryInfo:
         """Scan the repository and extract basic file information."""
