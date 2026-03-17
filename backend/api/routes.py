@@ -5,6 +5,9 @@ from services.repo_ingestion import RepoIngestionService, RepositoryInfo
 from parsers.parser_service import ParserService
 from parsers.dependency_extractor import DependencyExtractor
 from graph_builder.graph_builder_service import GraphBuilderService
+from ai_engine.ai_service import AIEngine
+from ai_engine.query_classifier import QueryClassifier
+from ai_engine.query_cache import QueryCache
 import os
 
 # Pydantic models for API requests/responses
@@ -17,6 +20,15 @@ class RepoIngestionResponse(BaseModel):
     classes_count: int
     functions_count: int
     message: str
+
+class QueryRequest(BaseModel):
+    question: str
+
+class QueryResponse(BaseModel):
+    answer: str
+    related_files: List[str]
+    confidence: float
+    references: List[Dict[str, Any]]
 
 class FileInfo(BaseModel):
     path: str
@@ -50,11 +62,112 @@ def get_graph_service() -> GraphBuilderService:
     # Get Neo4j connection details from environment variables
     uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
     user = os.getenv('NEO4J_USER', 'neo4j')
-    password = os.getenv('NEO4J_PASSWORD', 'password')
+    password = os.getenv('NEO4J_PASSWORD', 'neo4j')
     return GraphBuilderService(uri, user, password)
+
+def get_ai_engine() -> AIEngine:
+    # Get API keys from environment
+    neo4j_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+    neo4j_user = os.getenv('NEO4J_USER', 'neo4j')
+    neo4j_password = os.getenv('NEO4J_PASSWORD', 'neo4j')
+    grok_api_key = os.getenv('GROK_API_KEY')
+    openai_api_key = os.getenv('OPENAI_API_KEY')  # For embeddings
+
+    if not grok_api_key:
+        raise ValueError("GROK_API_KEY environment variable is required")
+
+    return AIEngine(neo4j_uri, neo4j_user, neo4j_password, grok_api_key, openai_api_key)
+
+def get_query_classifier() -> QueryClassifier:
+    return QueryClassifier()
+
+def get_query_cache() -> QueryCache:
+    return QueryCache(cache_dir=".cache", ttl_seconds=3600)  # 1 hour cache
 
 # Create router
 router = APIRouter()
+
+@router.post("/query", response_model=QueryResponse)
+async def query_codebase(
+    request: QueryRequest,
+    ai_engine: AIEngine = Depends(get_ai_engine),
+    query_classifier: QueryClassifier = Depends(get_query_classifier),
+    query_cache: QueryCache = Depends(get_query_cache)
+):
+    """Answer natural language questions about the codebase using AI."""
+    try:
+        # Check cache first
+        cached_result = query_cache.get(request.question)
+        if cached_result:
+            return QueryResponse(**cached_result)
+
+        # Classify the query
+        query_type = query_classifier.classify_query(request.question)
+
+        # Get relevant context from graph database
+        graph_context = ai_engine._get_graph_context(request.question)
+
+        # Build context string for the LLM
+        context_parts = []
+
+        if graph_context.get('authentication_classes'):
+            context_parts.append("Authentication-related classes:")
+            for cls in graph_context['authentication_classes']:
+                context_parts.append(f"- {cls['class_name']} in {cls['file_path']}")
+
+        if graph_context.get('dependencies'):
+            context_parts.append("\nDependency relationships:")
+            for dep in graph_context['dependencies'][:5]:  # Limit to avoid context overflow
+                context_parts.append(f"- {dep['from_file']} -> {dep['to_file']} ({dep['dependency_type']})")
+
+        context_str = "\n".join(context_parts)
+
+        # Build the prompt
+        system_prompt = f"""You are a senior software engineer analyzing a codebase. Answer the user's question based on the provided graph context about the codebase structure.
+
+Graph Context:
+{context_str}
+
+Query Type: {query_type['type']} ({query_type.get('subtype', 'general')})
+Target: {query_type.get('target', 'N/A')}
+
+Guidelines:
+- Answer accurately based on the provided context
+- Reference specific files and relationships when possible
+- If you don't have enough information, say so clearly
+- Keep answers concise but informative
+- Use technical terms appropriately
+
+Question: {request.question}"""
+
+        # Get AI response
+        answer = ai_engine.llm._call(system_prompt)
+
+        # Calculate confidence (simplified)
+        confidence = 0.8 if graph_context else 0.6
+
+        # Extract related files from context
+        related_files = []
+        if graph_context.get('authentication_classes'):
+            for cls in graph_context['authentication_classes']:
+                if cls['file_path'] not in related_files:
+                    related_files.append(cls['file_path'])
+
+        # Build response
+        result = {
+            'answer': answer,
+            'related_files': related_files,
+            'confidence': confidence,
+            'references': []
+        }
+
+        # Cache the result
+        query_cache.set(request.question, result)
+
+        return QueryResponse(**result)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
 
 @router.post("/ingest-repo", response_model=RepoIngestionResponse)
 async def ingest_repository(
