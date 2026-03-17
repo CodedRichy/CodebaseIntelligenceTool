@@ -18,13 +18,22 @@ class GraphBuilderService:
         if not self.driver:
             return
         with self.driver.session() as session:
-            # Create indexes
-            session.run("CREATE INDEX file_path IF NOT EXISTS FOR (f:File) ON (f.path)")
-            session.run("CREATE INDEX function_name IF NOT EXISTS FOR (fn:Function) ON (fn.name)")
-            session.run("CREATE INDEX class_name IF NOT EXISTS FOR (c:Class) ON (c.name)")
+            # Create indexes/constraints with individual try-except to handle conflicts gracefully
+            try:
+                session.run("CREATE INDEX file_path IF NOT EXISTS FOR (f:File) ON (f.path)")
+            except: pass
+            
+            try:
+                session.run("CREATE INDEX function_name IF NOT EXISTS FOR (fn:Function) ON (fn.name)")
+            except: pass
+            
+            try:
+                session.run("CREATE INDEX class_name IF NOT EXISTS FOR (c:Class) ON (c.name)")
+            except: pass
 
-            # Create constraints
-            session.run("CREATE CONSTRAINT file_path_unique IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE")
+            try:
+                session.run("CREATE CONSTRAINT file_path_unique IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE")
+            except: pass
 
     def close(self):
         """Close the Neo4j driver."""

@@ -42,14 +42,9 @@ class ParserService:
             python_lang = Language(tree_sitter_python.language())
             js_lang = Language(tree_sitter_javascript.language())
 
-            self.parsers['.py'] = Parser()
-            self.parsers['.py'].set_language(python_lang)
-
-            self.parsers['.js'] = Parser()
-            self.parsers['.js'].set_language(js_lang)
-
-            self.parsers['.ts'] = Parser()  # TypeScript uses JS parser for now
-            self.parsers['.ts'].set_language(js_lang)
+            self.parsers['.py'] = Parser(python_lang)
+            self.parsers['.js'] = Parser(js_lang)
+            self.parsers['.ts'] = Parser(js_lang)
 
         except Exception as e:
             raise Exception(f"Failed to initialize tree-sitter parsers: {e}")
