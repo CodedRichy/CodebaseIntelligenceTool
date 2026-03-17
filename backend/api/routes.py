@@ -104,60 +104,17 @@ async def query_codebase(
         # Classify the query
         query_type = query_classifier.classify_query(request.question)
 
-        # Get relevant context from graph database
-        graph_context = ai_engine._get_graph_context(request.question)
-
-        # Build context string for the LLM
-        context_parts = []
-
-        if graph_context.get('authentication_classes'):
-            context_parts.append("Authentication-related classes:")
-            for cls in graph_context['authentication_classes']:
-                context_parts.append(f"- {cls['class_name']} in {cls['file_path']}")
-
-        if graph_context.get('dependencies'):
-            context_parts.append("\nDependency relationships:")
-            for dep in graph_context['dependencies'][:5]:  # Limit to avoid context overflow
-                context_parts.append(f"- {dep['from_file']} -> {dep['to_file']} ({dep['dependency_type']})")
-
-        context_str = "\n".join(context_parts)
-
-        # Build the prompt
-        system_prompt = f"""You are a senior software engineer analyzing a codebase. Answer the user's question based on the provided graph context about the codebase structure.
-
-Graph Context:
-{context_str}
-
-Query Type: {query_type['type']} ({query_type.get('subtype', 'general')})
-Target: {query_type.get('target', 'N/A')}
-
-Guidelines:
-- Answer accurately based on the provided context
-- Reference specific files and relationships when possible
-- If you don't have enough information, say so clearly
-- Keep answers concise but informative
-- Use technical terms appropriately
-
-Question: {request.question}"""
-
-        # Get AI response
-        answer = ai_engine.llm._call(system_prompt)
-
-        # Calculate confidence (simplified)
-        confidence = 0.8 if graph_context else 0.6
-
-        # Extract related files from context
-        related_files = []
-        if graph_context.get('authentication_classes'):
-            for cls in graph_context['authentication_classes']:
-                if cls['file_path'] not in related_files:
-                    related_files.append(cls['file_path'])
+        # Get AI response using the service
+        ai_result = ai_engine.query_codebase_with_context(
+            request.question, 
+            query_type
+        )
 
         # Build response
         result = {
-            'answer': answer,
-            'related_files': related_files,
-            'confidence': confidence,
+            'answer': ai_result['answer'],
+            'related_files': ai_result['related_files'],
+            'confidence': 0.85 if ai_result['related_files'] else 0.6,
             'references': []
         }
 

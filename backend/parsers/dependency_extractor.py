@@ -1,4 +1,4 @@
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
 from parsers.parser_service import ParserService, ImportElement, FunctionCall
 
 class DependencyExtractor:

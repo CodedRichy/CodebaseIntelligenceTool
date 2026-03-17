@@ -9,7 +9,7 @@ from langchain.vectorstores import Neo4jVector
 from langchain.embeddings import OpenAIEmbeddings  # Keep for embeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.document_loaders import TextLoader
-from graph_builder.graph_service import GraphBuilderService
+from graph_builder.graph_builder_service import GraphBuilderService
 
 class GrokLLM(LLM):
     """Custom LLM class for Grok/xAI integration."""
@@ -74,8 +74,10 @@ class AIEngine:
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str, grok_api_key: str, openai_api_key: str = None):
         self.graph_service = GraphBuilderService(neo4j_uri, neo4j_user, neo4j_password)
 
-        # Use OpenAI for embeddings (more reliable for code)
+        # Use OpenAI for embeddings if key provided
         self.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key) if openai_api_key else None
+        if not self.embeddings:
+            print("Warning: No OpenAI API key provided. Vector-based search will be disabled.")
 
         # Use Grok for text generation
         self.llm = GrokLLM(api_key=grok_api_key, model_name="grok-beta", temperature=0.1)
@@ -109,15 +111,21 @@ class AIEngine:
 
     def query_codebase(self, query: str, vectorstore: Neo4jVector) -> Dict[str, Any]:
         """Query the codebase using natural language."""
-        # Create retrieval QA chain
-        qa_chain = RetrievalQA.from_chain_type(
-            self.llm,
-            retriever=vectorstore.as_retriever(),
-            return_source_documents=True
-        )
-
-        # Execute query
-        result = qa_chain({"query": query})
+        # Create retrieval QA chain if embeddings are available
+        if vectorstore and self.embeddings:
+            qa_chain = RetrievalQA.from_chain_type(
+                self.llm,
+                retriever=vectorstore.as_retriever(),
+                return_source_documents=True
+            )
+            # Execute query
+            result = qa_chain({"query": query})
+            answer = result['result']
+            sources = [doc.page_content for doc in result['source_documents']]
+        else:
+            # Fallback to direct LLM if no vector store (will rely on graph context)
+            answer = None
+            sources = []
 
         # Enhance with graph-based analysis
         graph_context = self._get_graph_context(query)
@@ -128,29 +136,88 @@ class AIEngine:
             'graph_context': graph_context
         }
 
-    def _get_graph_context(self, query: str) -> Dict[str, Any]:
+    def query_codebase_with_context(self, query: str, query_type: Dict[str, Any], vectorstore: Any = None) -> Dict[str, Any]:
+        """Query the codebase using natural language and graph context."""
+        # Get relevant context from the knowledge graph based on query type
+        graph_context = self._get_graph_context(query, query_type)
+        
+        # Build context string for the prompt
+        context_parts = []
+        if graph_context.get('files'):
+            context_parts.append("Relevant Files:")
+            for f in graph_context['files']:
+                context_parts.append(f"- {f['path']}")
+        
+        if graph_context.get('dependencies'):
+            context_parts.append("\nCode Relationships:")
+            for dep in graph_context['dependencies']:
+                context_parts.append(f"- {dep.get('from_file', 'Unknown')} depends on {dep.get('to_file', 'Unknown')} ({dep.get('dependency_type', 'import')})")
+
+        context_str = "\n".join(context_parts)
+        
+        # Build a robust prompt
+        system_prompt = f"""You are an advanced AI codebase assistant. 
+Analyze the following context from a code knowledge graph to answer the user's question accurately.
+
+Graph Context:
+{context_str}
+
+User Question: {query}
+
+Instructions:
+- Be technical and precise.
+- Reference specific files and relationships from the context.
+- If the context doesn't contain the answer, tell the user what's missing.
+- Use a professional SaaS engineer tone."""
+
+        # Get answer from Grok
+        answer = self.llm._call(system_prompt)
+
+        return {
+            'answer': answer,
+            'related_files': [f['path'] for f in graph_context.get('files', []) if 'path' in f],
+            'graph_context': graph_context
+        }
+
+    def _get_graph_context(self, query: str, query_type: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get relevant context from the knowledge graph."""
         context = {}
+        target = query_type.get('target') if query_type else None
+        
+        # Handle based on query type
+        if query_type and query_type['type'] == 'dependency_query':
+            if target:
+                query_cypher = f"""
+                MATCH (f1:File)-[r:IMPORTS|DEPENDS_ON]->(f2:File)
+                WHERE f1.path CONTAINS '{target}' OR f2.path CONTAINS '{target}'
+                RETURN f1.path as from_file, f2.path as to_file, type(r) as dependency_type
+                LIMIT 20
+                """
+            else:
+                query_cypher = """
+                MATCH (f1:File)-[r:IMPORTS|DEPENDS_ON]->(f2:File)
+                RETURN f1.path as from_file, f2.path as to_file, type(r) as dependency_type
+                LIMIT 10
+                """
+            context['dependencies'] = self.graph_service.query_codebase(query_cypher)
 
-        # Example: Find files related to authentication
-        if 'authentication' in query.lower():
+        # General file/class context for explanation or other queries
+        if 'auth' in query.lower() or (target and 'auth' in target.lower()):
             query_cypher = """
             MATCH (f:File)-[:DEFINES]->(c:Class)
-            WHERE c.name =~ '(?i).*auth.*'
-            RETURN f.path as file_path, c.name as class_name
+            WHERE c.name =~ '(?i).*auth.*' OR f.path =~ '(?i).*auth.*'
+            RETURN f.path as path, c.name as class_name
             """
-            auth_classes = self.graph_service.query_codebase(query_cypher)
-            context['authentication_classes'] = auth_classes
-
-        # Example: Find dependencies
-        elif 'depend' in query.lower():
-            query_cypher = """
-            MATCH (f1:File)-[r:DEPENDS_ON]->(f2:File)
-            RETURN f1.path as from_file, f2.path as to_file, r.type as dependency_type
-            LIMIT 10
+            context['files'] = self.graph_service.query_codebase(query_cypher)
+        
+        if not context.get('files') and target:
+            # Search for the target in the graph
+            query_cypher = f"""
+            MATCH (f:File)
+            WHERE f.path CONTAINS '{target}'
+            RETURN f.path as path
             """
-            dependencies = self.graph_service.query_codebase(query_cypher)
-            context['dependencies'] = dependencies
+            context['files'] = self.graph_service.query_codebase(query_cypher)
 
         return context
 
