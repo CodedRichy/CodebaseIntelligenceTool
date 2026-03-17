@@ -1,0 +1,92 @@
+{
+    "name": "codebase-intelligence",
+    "displayName": "Codebase Intelligence",
+    "description": "AI-powered codebase analysis and querying directly in VSCode",
+    "version": "1.0.0",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onView:codebaseIntelligenceView"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "codebase-intelligence.analyzeCodebase",
+                "title": "Codebase Intelligence: Analyze Codebase"
+            },
+            {
+                "command": "codebase-intelligence.askCodebase",
+                "title": "Codebase Intelligence: Ask Question"
+            },
+            {
+                "command": "codebase-intelligence.explainCode",
+                "title": "Codebase Intelligence: Explain this Code"
+            },
+            {
+                "command": "codebase-intelligence.impactAnalysis",
+                "title": "Codebase Intelligence: Impact Analysis"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "codebase-intelligence.explainCode",
+                    "group": "navigation",
+                    "when": "editorHasSelection"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "codebase-intelligence",
+                    "title": "Codebase Intelligence",
+                    "icon": "$(search-fuzzy)"
+                }
+            ]
+        },
+        "views": {
+            "codebase-intelligence": [
+                {
+                    "id": "codebaseIntelligenceView",
+                    "name": "Intelligence Dashboard",
+                    "type": "webview"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Codebase Intelligence",
+            "properties": {
+                "codebaseIntelligence.apiUrl": {
+                    "type": "string",
+                    "default": "http://127.0.0.1:8000",
+                    "description": "The URL of the codebase intelligence backend API."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/node": "18.x",
+        "@types/vscode": "^1.80.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.45.0",
+        "typescript": "^5.1.6"
+    },
+    "dependencies": {
+        "axios": "^1.4.0"
+    }
+}
