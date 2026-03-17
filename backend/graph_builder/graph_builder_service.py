@@ -4,11 +4,19 @@ from parsers.parser_service import CodeElement, ImportElement, FunctionCall
 
 class GraphBuilderService:
     def __init__(self, uri: str, user: str, password: str):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        self._create_indexes()
+        try:
+            self.driver = GraphDatabase.driver(uri, auth=(user, password))
+            # Test connection
+            self.driver.verify_connectivity()
+            self._create_indexes()
+        except Exception as e:
+            print(f"CRITICAL: Failed to connect to Neo4j: {e}")
+            self.driver = None
 
     def _create_indexes(self):
         """Create necessary indexes for performance."""
+        if not self.driver:
+            return
         with self.driver.session() as session:
             # Create indexes
             session.run("CREATE INDEX file_path IF NOT EXISTS FOR (f:File) ON (f.path)")
@@ -24,6 +32,8 @@ class GraphBuilderService:
 
     def create_repository_node(self, repo_info: Dict) -> str:
         """Create a repository node and return its ID."""
+        if not self.driver:
+            raise Exception("Database driver not initialized. Check Neo4j connection.")
         with self.driver.session() as session:
             result = session.run(
                 """
@@ -39,6 +49,8 @@ class GraphBuilderService:
 
     def create_file_nodes(self, repo_id: int, files: List[Dict]):
         """Create file nodes and connect them to the repository."""
+        if not self.driver:
+            return
         with self.driver.session() as session:
             for file_info in files:
                 session.run(
@@ -60,6 +72,8 @@ class GraphBuilderService:
     def create_code_element_nodes(self, classes: List[CodeElement],
                                 functions: List[CodeElement]):
         """Create class and function nodes and connect them to files."""
+        if not self.driver:
+            return
         with self.driver.session() as session:
             # Create class nodes
             for cls in classes:
@@ -132,6 +146,8 @@ class GraphBuilderService:
 
     def get_files(self) -> List[Dict[str, Any]]:
         """Get all files in the graph."""
+        if not self.driver:
+            return []
         with self.driver.session() as session:
             result = session.run(
                 """
