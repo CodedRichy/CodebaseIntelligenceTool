@@ -6,7 +6,7 @@ from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.outputs import LLMResult
 from langchain_community.vectorstores import Neo4jVector
 from langchain_openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from graph_builder.graph_builder_service import GraphBuilderService
 
