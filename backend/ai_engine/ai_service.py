@@ -1,18 +1,84 @@
 import os
 from typing import List, Dict, Any
+import requests
+from langchain.llms.base import LLM
+from langchain.callbacks.manager import CallbackManagerForLLMRun
+from langchain.schema import LLMResult
 from langchain.chains import RetrievalQA
-from langchain.llms import OpenAI
 from langchain.vectorstores import Neo4jVector
-from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings import OpenAIEmbeddings  # Keep for embeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.document_loaders import TextLoader
 from graph_builder.graph_service import GraphBuilderService
 
+class GrokLLM(LLM):
+    """Custom LLM class for Grok/xAI integration."""
+
+    model_name: str = "grok-beta"
+    temperature: float = 0.1
+    max_tokens: int = 2048
+    api_key: str = ""
+
+    def __init__(self, api_key: str, model_name: str = "grok-beta", temperature: float = 0.1):
+        super().__init__()
+        self.api_key = api_key
+        self.model_name = model_name
+        self.temperature = temperature
+
+    @property
+    def _llm_type(self) -> str:
+        return "grok"
+
+    def _call(self, prompt: str, stop: List[str] = None, run_manager: CallbackManagerForLLMRun = None) -> str:
+        """Make API call to Grok."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        data = {
+            "messages": [{"role": "user", "content": prompt}],
+            "model": self.model_name,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "stream": False
+        }
+
+        if stop:
+            data["stop"] = stop
+
+        try:
+            response = requests.post(
+                "https://api.x.ai/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Grok API error: {str(e)}")
+
+    @property
+    def _identifying_params(self) -> Dict[str, Any]:
+        return {
+            "model_name": self.model_name,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens
+        }
+
 class AIEngine:
-    def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str, openai_api_key: str):
+    def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str, grok_api_key: str, openai_api_key: str = None):
         self.graph_service = GraphBuilderService(neo4j_uri, neo4j_user, neo4j_password)
-        self.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-        self.llm = OpenAI(temperature=0, openai_api_key=openai_api_key)
+
+        # Use OpenAI for embeddings (more reliable for code)
+        self.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key) if openai_api_key else None
+
+        # Use Grok for text generation
+        self.llm = GrokLLM(api_key=grok_api_key, model_name="grok-beta", temperature=0.1)
 
     def build_code_embeddings(self, files: List[Dict]) -> Neo4jVector:
         """Build vector embeddings for code files."""
