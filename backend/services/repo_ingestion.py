@@ -76,7 +76,17 @@ class RepoIngestionService:
         return any(filename.endswith(ext) for ext in code_extensions)
 
     async def cleanup_repository(self, repo_info: RepositoryInfo):
-        """Clean up the cloned repository."""
+        """Clean up the cloned repository with robustness for Windows permission issues."""
         import shutil
+        import stat
+
+        def remove_readonly(func, path, excinfo):
+            """Error handler for shutil.rmtree to handle read-only files."""
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
         if os.path.exists(repo_info.local_path):
-            shutil.rmtree(repo_info.local_path)
+            try:
+                shutil.rmtree(repo_info.local_path, onerror=remove_readonly)
+            except Exception as e:
+                print(f"Warning: Failed to fully clean up {repo_info.local_path}: {e}")
