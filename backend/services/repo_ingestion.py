@@ -36,7 +36,8 @@ class RepoIngestionService:
 
             # Optimized: Use shallow clone (depth=1) to save time/bandwidth
             if not os.path.exists(local_path):
-                Repo.clone_from(repo_url, local_path, depth=1)
+                repo = Repo.clone_from(repo_url, local_path, depth=1)
+                repo.close()
 
             return RepositoryInfo(
                 url=repo_url,

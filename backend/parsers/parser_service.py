@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from tree_sitter import Language, Parser, Node
 import tree_sitter_python
 import tree_sitter_javascript
