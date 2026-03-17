@@ -1,14 +1,13 @@
 import os
 from typing import List, Dict, Any
 import requests
-from langchain.llms.base import LLM
-from langchain.callbacks.manager import CallbackManagerForLLMRun
-from langchain.schema import LLMResult
-from langchain.chains import RetrievalQA
-from langchain.vectorstores import Neo4jVector
-from langchain.embeddings import OpenAIEmbeddings  # Keep for embeddings
+from langchain_core.language_models.llms import LLM
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain_core.outputs import LLMResult
+from langchain_community.vectorstores import Neo4jVector
+from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.document_loaders import TextLoader
+from langchain_community.document_loaders import TextLoader
 from graph_builder.graph_builder_service import GraphBuilderService
 
 class GrokLLM(LLM):
@@ -108,33 +107,6 @@ class AIEngine:
         )
 
         return vectorstore
-
-    def query_codebase(self, query: str, vectorstore: Neo4jVector) -> Dict[str, Any]:
-        """Query the codebase using natural language."""
-        # Create retrieval QA chain if embeddings are available
-        if vectorstore and self.embeddings:
-            qa_chain = RetrievalQA.from_chain_type(
-                self.llm,
-                retriever=vectorstore.as_retriever(),
-                return_source_documents=True
-            )
-            # Execute query
-            result = qa_chain({"query": query})
-            answer = result['result']
-            sources = [doc.page_content for doc in result['source_documents']]
-        else:
-            # Fallback to direct LLM if no vector store (will rely on graph context)
-            answer = None
-            sources = []
-
-        # Enhance with graph-based analysis
-        graph_context = self._get_graph_context(query)
-
-        return {
-            'answer': result['result'],
-            'sources': [doc.page_content for doc in result['source_documents']],
-            'graph_context': graph_context
-        }
 
     def query_codebase_with_context(self, query: str, query_type: Dict[str, Any], vectorstore: Any = None) -> Dict[str, Any]:
         """Query the codebase using natural language and graph context."""
