@@ -1,4 +1,11 @@
-# Python
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.bak
+*.tmp
+
+# Python / Backend
 __pycache__/
 *.py[cod]
 *$py.class
@@ -21,44 +28,37 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Environments
 .env
 .venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
-
-# Virtualenv
-# http://iamzed.com/2009/05/07/a-gitignore-file-for-python-projects/
-.Python
-[Bb]in
-[Ll]ib
-[Ss]cripts
 pyvenv.cfg
-.venv
 pip-selfcheck.json
-
-# Cache
 .cache/
 .pytest_cache/
 .mypy_cache/
-
-# Project specific
 test_repo/
 temp_repos/
-*.log
 
-# OS
-.DS_Store
-Thumbs.db
+# Node.js / VSCode Extension
+node_modules/
+out/
+.vscode-test/
+*.vsix
+vscode-extension/out/
+vscode-extension/node_modules/
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea/
+*.swp
+*.swo
 
 # Database
 *.db
 *.sqlite
+database/data/
+database/logs/

@@ -128,7 +128,18 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-	context.subscriptions.push(analyzeCmd, askCmd, explainCmd, impactCmd);
+    // Command: Get Map
+    let getMapCmd = vscode.commands.registerCommand('codebase-intelligence.getMap', async () => {
+        const apiUrl = vscode.workspace.getConfiguration('codebaseIntelligence').get<string>('apiUrl', 'http://127.0.0.1:8000');
+        try {
+            const response = await axios.get(`${apiUrl}/api/graph/files`);
+            sidebarProvider.postMessage({ type: 'map-data', data: response.data });
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to get map: ${error.message}`);
+        }
+    });
+
+	context.subscriptions.push(analyzeCmd, askCmd, explainCmd, impactCmd, getMapCmd);
 }
 
 export function deactivate() {}

@@ -7,7 +7,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
-		context: vscode.WebviewViewResolveContext,
+		_context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken
 	) {
 		this._view = webviewView;
@@ -33,6 +33,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 					vscode.commands.executeCommand('codebase-intelligence.impactAnalysis');
 					break;
 				}
+                case 'onGetMap': {
+                    vscode.commands.executeCommand('codebase-intelligence.getMap');
+                    break;
+                }
 				case 'onError': {
 					if (!data.value) return;
 					vscode.window.showErrorMessage(data.value);
@@ -54,7 +58,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	private _getHtmlForWebview(webview: vscode.Webview) {
+	private _getHtmlForWebview(_webview: vscode.Webview) {
 		return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
@@ -78,6 +82,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 					<button class="btn" onclick="analyze()">⚡ Analyze Codebase</button>
 					<button class="btn btn-secondary" onclick="ask()">💬 Ask a Question</button>
                     <button class="btn btn-secondary" onclick="impact()">🔍 Impact Analysis</button>
+                    <button class="btn btn-secondary" onclick="getMap()">🌐 View Project Map</button>
 				</div>
 
 				<div id="ai-response-container" style="display: none;">
@@ -87,19 +92,34 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 					</div>
 				</div>
 
+				<div id="map-container" style="display: none;">
+					<div class="card">
+						<div class="title">PROJECT MAP (FILES)</div>
+						<div class="content" id="map-content">Loading...</div>
+					</div>
+				</div>
+
 				<script>
 					const vscode = acquireVsCodeApi();
 
                     function analyze() { vscode.postMessage({ type: 'onAnalyze' }); }
 					function ask() { vscode.postMessage({ type: 'onAsk' }); }
                     function impact() { vscode.postMessage({ type: 'onImpact' }); }
+                    function getMap() { vscode.postMessage({ type: 'onGetMap' }); }
 
 					window.addEventListener('message', (event) => {
 						const message = event.data;
 						switch (message.type) {
 							case 'ai-response':
 								document.getElementById('ai-response-container').style.display = 'block';
+								document.getElementById('map-container').style.display = 'none';
 								document.getElementById('ai-content').innerText = message.data.answer;
+								break;
+                            case 'map-data':
+								document.getElementById('ai-response-container').style.display = 'none';
+								document.getElementById('map-container').style.display = 'block';
+                                const files = message.data;
+                                document.getElementById('map-content').innerHTML = files.map(f => '<div>📄 ' + f.path + '</div>').join('');
 								break;
 						}
 					});
