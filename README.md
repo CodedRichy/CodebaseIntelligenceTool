@@ -1,89 +1,103 @@
-# CodeSense AI 🧠
+<div align="center">
 
-**CodeSense AI** is a powerful codebase intelligence tool that transforms your static source code into a dynamic, queryable knowledge graph. By combining **Tree-sitter** for advanced parsing, **Neo4j** for relationship tracking, and **Grok (xAI)** for natural language understanding, CodeSense allows developers to "talk" to their codebase.
+# CodeSense AI
 
----
+**Talk to your codebase.**
 
-## ✨ Features
+AI-powered tool that parses source code into a Neo4j knowledge graph and lets you query your codebase in natural language using Grok/xAI.
 
-- 📂 **Multi-Language Parsing**: Deep structural analysis of Python, JavaScript, and TypeScript using Tree-sitter.
-- 🕸️ **Knowledge Graph**: Tracks complex relationships including file imports and cross-file function calls.
-- 💬 **Natural Language Queries**: Ask questions like *"Which files depend on authentication logic?"* or *"What happens if I change this function?"*
-- 🎨 **Premium UI**: Modern, glassmorphic chat interface with real-time stats and visual feedback.
-- 🚀 **Fast Ingestion**: Rapidly clone and index local or remote repositories.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/fastapi-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Neo4j](https://img.shields.io/badge/neo4j-4581C3?style=flat-square&logo=neo4j&logoColor=white)](https://neo4j.com)
 
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Vanilla HTML5, CSS3 (Glassmorphism), JavaScript (ES6+), Lucide Icons.
-- **Backend**: FastAPI (Python 3.10+), Uvicorn.
-- **AI/LLM**: Grok-beta (via xAI API), LangChain.
-- **Database**: Neo4j (Graph Database).
-- **Parsers**: Tree-sitter.
+</div>
 
 ---
 
-## 🚀 Getting Started
+## What It Does
 
-### 1. Prerequisites
-- **Neo4j**: Ensure Neo4j is installed and running (default: `bolt://localhost:7687`).
-- **Python 3.10+**
-- **xAI API Key**: Required for the Grok LLM.
+Point CodeSense at any GitHub repo. It clones, parses the AST with Tree-sitter, maps symbols into a Neo4j graph, then lets you ask natural language questions about the code.
 
-### 2. Installation
+```
+"Which files depend on authentication logic?"
+"What happens if I change this function?"
+"Show me all imports in app.py"
+```
+
+## How It Works
+
+1. **Ingest** -- Clones repo to temp directory
+2. **Parse** -- Tree-sitter generates ASTs, extracts symbols (classes, functions, imports)
+3. **Graph** -- Maps symbols into Neo4j nodes with relationships (`IMPORTS`, `CALLS`, `DEFINES`)
+4. **Reason** -- Grok analyzes graph structure for context-aware answers
+
+## Features
+
+- **Multi-Language Parsing** -- Python, JavaScript, TypeScript via Tree-sitter
+- **Knowledge Graph** -- Tracks file imports, cross-file function calls, class hierarchies
+- **Natural Language Queries** -- Ask questions, get graph-backed answers
+- **VS Code Extension** -- Query your codebase directly from the editor
+- **Web UI** -- Glassmorphic chat interface with real-time stats
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- [Neo4j](https://neo4j.com/download/) running on `bolt://localhost:7687`
+- xAI API key (for Grok LLM)
+
+### Install
 
 ```bash
-# Clone the project
 git clone https://github.com/CodedRichy/CodebaseIntelligenceTool.git
-cd CodebaseIntelligenceTool
-
-# Install dependencies
-cd backend
+cd CodebaseIntelligenceTool/backend
 pip install -r requirements.txt
 ```
 
-### 3. Configuration
-Update the `backend/.env` file with your credentials:
-```env
+### Configure
+
+```bash
+# backend/.env
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 GROK_API_KEY=your_xai_key
 ```
 
-### 4. Running the Tool
+### Run
 
-**Start the Backend:**
 ```bash
 cd backend
 python -m uvicorn app:app --reload
 ```
 
-**Open the Frontend:**
-Simply open `frontend/index.html` in your browser. (Or serve it via `python -m http.server 3000`).
+Open `frontend/index.html` in your browser (or `python -m http.server 3000`).
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| **Backend** | FastAPI, Uvicorn |
+| **AI/LLM** | Grok (xAI API), LangChain |
+| **Graph DB** | Neo4j |
+| **Parsing** | Tree-sitter (Python, JS, TS) |
+| **Frontend** | Vanilla HTML/CSS/JS |
+| **VS Code** | TypeScript extension |
+
+## Project Structure
+
+```
+backend/            FastAPI app, parsers, graph builder, AI engine
+database/           Neo4j Cypher schema
+frontend/           Single-page web interface
+vscode-extension/   VS Code extension (TypeScript)
+```
 
 ---
 
-## 📖 Usage
+<div align="center">
 
-1. **Ingest**: Paste a GitHub URL (e.g., `https://github.com/fastapi/fastapi`) into the sidebar and click **Ingest**.
-2. **Analyze**: Once the progress bar finishes, you'll see file and function counts.
-3. **Query**: Ask any question in the chat. Examples:
-   - *"What are the main entry points of this app?"*
-   - *"Show me all imports in app.py"*
-   - *"Which functions call the database directly?"*
+Built by [Rishi Praseeth Krishnan](https://rishipraseeth.in)
 
----
-
-## 🏗️ Architecture
-
-CodeSense AI works in four stages:
-1. **Ingestion**: Clones the repo to a temp directory.
-2. **Parsing**: Uses Tree-sitter to generate ASTs and extract symbols (Classes, Functions, Imports).
-3. **Graphing**: Maps those symbols into Neo4j nodes and creates relationships (`IMPORTS`, `CALLS`, `DEFINES`).
-4. **Reasoning**: Grok analyzes the graph structure to provide context-aware answers.
-
----
-
-*Built with ❤️ for developers who hate reading legacy code.*
+</div>
